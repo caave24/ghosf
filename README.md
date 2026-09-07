@@ -1,383 +1,151 @@
-# GHOSF
+# ghosf
 
-> **GHOSF does not just modify pixels. It treats previous moments in time as image layers.**
+> **ghosf treats previous moments in time as image layers.**
 
-GHOSF is an experimental Python + FFmpeg temporal video processor.
+## Download & Run
 
-The present remains sharp. Previous moments remain visible as temporal layers that can fade, pixelate, drift, transform, and decay.
+```bash
+git clone <REPOSITORY_URL>
+cd ghosf
+
+python3 -m venv .venv
+source .venv/bin/activate
+
+python -m pip install -r requirements.txt
+python app.py
+```
+
+`ghosf` uses a project-local `.venv`. No Python packages need to be installed globally.
 
 ---
 
-# Temporal Pixel Decay
+## What it does
 
-The further back a frame exists in time, the less spatial information it retains.
-
-The past is not simply transparent.
-
-It becomes increasingly low-resolution.
-
-```text id="ghosf-oldest-current"
-OLDEST                                      CURRENT
-
-▓▓▓▓▓▓▓▓▓▓      ▒▒▒▒▒▒▒▒▒▒      ░░░░░░░░      ███████████
-▓▓▓▓▓▓▓▓▓▓  →   ▒▒▒▒▒▒▒▒▒▒  →   ░░░░░░░░  →   ███████████
-
-heavily         pixelated         slightly        sharp
-pixelated                         pixelated
+```text
+VIDEO
+  ↓
+DECODE EVERY FRAME
+  ↓
+CURRENT FRAME + PREVIOUS MOMENTS
+  ↓
+TEMPORAL GHOSTING / PROCESSING
+  ↓
+REASSEMBLE VIDEO
 ```
 
-```text id="ghosf-time-resolution"
-TIME ───────────────────────────────→ NOW
+The video keeps its original:
 
-t-10     t-8      t-6      t-4      t-2      NOW
-████     ▓▓▓▓     ▒▒▒▒     ░░░░     ░░░░     ████████
+- FPS
+- duration
+- frame count
+- playback speed
+- audio, when available
 
-8 px     6 px     4 px     2 px     1 px     FULL RES
-```
-
-```text id="ghosf-information"
-PAST                                   PRESENT
-
-LOW INFORMATION                       HIGH INFORMATION
-
-▓▓▓▓▓▓▓▓
-     ▒▒▒▒▒▒▒▒
-          ░░░░░░░░
-               ███████████
-```
-
-> **The further a moment is from now, the less information it retains.**
+`ghosf` changes how much of the past remains visible in the present.
 
 ---
 
-# Temporal Layers
+## Temporal Ghosts
 
-Every previous frame can change according to its temporal age.
+Each output frame can contain the current moment plus earlier moments.
 
-```text id="ghosf-temporal-profile"
-PAST FRAME
-    │
-    ▼
-TEMPORAL AGE
-    │
-    ▼
-┌──────────────────┐
-│ TEMPORAL PROFILE │
-├──────────────────┤
-│ opacity          │
-│ resolution       │
-│ blur             │
-│ color            │
-│ position         │
-│ scale            │
-│ transformation   │
-└──────────────────┘
-    │
-    ▼
-TEMPORAL LAYER
-```
-
-```text id="ghosf-layer-age"
-DISTANT PAST
-large pixels • low detail • low opacity
-
-OLDER PAST
-medium pixels • degraded detail
-
-RECENT PAST
-near-full resolution • mostly intact
-
-NOW
-full resolution • present reality
-```
-
-This allows effects to combine:
-
-```text id="ghosf-combinations"
-GHOST + PIXEL DECAY + COLOR AGE + TEMPORAL DRIFT
-```
-
-or:
-
-```text id="ghosf-heavy-pixel"
-GHOST + HEAVY PIXEL DECAY + NO OPACITY DECAY
-```
-
----
-
-# Ghosting
-
-Previous moments can be layered onto the present.
-
-```text id="ghosf-ghost-stack"
+```text
 CURRENT
-+
-RECENT PAST
-+
-OLDER PAST
-+
-DISTANT PAST
+
+NOW      ████████████
+-1       ▓▓▓▓▓▓▓▓▓
+-2       ▒▒▒▒▒▒▒
+-3       ░░░░░░
 ```
 
-Each layer can have independent temporal properties:
+### Ghost History
 
-```text id="ghosf-time-properties"
-TIME
- │
- ├── opacity
- ├── resolution
- ├── blur
- ├── color
- ├── position
- └── transformation
+How many previous moments remain visible.
+
+### Ghost Frame Interval
+
+How far apart those moments are.
+
+```text
+Interval 1
+
+F10 → F9 → F8 → F7
+```
+
+```text
+Interval 2
+
+F10 → F8 → F6 → F4
+```
+
+This affects **ghost layers only**. Every original video frame remains in the output.
+
+---
+
+## Ghost Appearance
+
+Previous moments can change gradually with age:
+
+- Contrast
+- Shadow Depth
+- Highlight Intensity
+- Brightness
+
+```text
+NOW       → natural
+RECENT    → subtle treatment
+OLDER     → stronger treatment
+OLDEST    → strongest treatment
 ```
 
 ---
 
-# Pixel Decay
+## Blend Modes
 
-Older frames are progressively downscaled, then enlarged using nearest-neighbor scaling.
+**Normal** — transparent temporal layers.
 
-```text id="ghosf-pixel-pipeline"
-PREVIOUS FRAME
-      ↓
-TEMPORAL AGE
-      ↓
-CALCULATE PIXEL SIZE
-      ↓
-DOWNSCALE
-      ↓
-UPSCALE (NEAREST NEIGHBOR)
-      ↓
-APPLY OPACITY
-      ↓
-BLEND WITH PRESENT
-```
+**Screen** — light from previous moments accumulates.
 
-Example:
-
-```text id="ghosf-resolution-example"
-1920 × 1080
-    ↓
-120 × 68
-    ↓
-1920 × 1080
-```
-
-**Blur** means the past becomes soft.
-
-**Pixelation** means the past loses information.
-
-GHOSF can eventually use both.
+**Additive** — stronger, energetic temporal trails.
 
 ---
 
-# Temporal Curves
+## Other Features
 
-Temporal decay can follow different patterns.
-
-```text id="ghosf-linear"
-LINEAR
-
-1 → 2 → 4 → 6 → 8 → 10 → 12 → 16
-```
-
-```text id="ghosf-exponential"
-EXPONENTIAL
-
-1 → 1 → 1 → 2 → 2 → 4 → 8 → 16
-```
-
-```text id="ghosf-memory"
-MEMORY DECAY
-
-1 → 2 → 2 → 4 → 4 → 8 → 8 → 16
-```
-
-Recent moments can remain detailed while distant moments rapidly lose information.
-
----
-
-# Temporal Camera Tricks
-
-GHOSF is designed as a collection of temporal camera experiments.
-
-## Ghost
-
-Previous frames remain visible behind the present.
-
-```text id="ghosf-ghost"
-▓▓▓▓ → ▒▒▒▒ → ░░░░ → ████████
-PAST                       NOW
-```
-
-## Temporal Reverb
-
-Like audio echoes, but across time.
-
-```text id="ghosf-reverb"
-NOW
--1
--2
--4
--8
--16
-```
-
-```text id="ghosf-reverb-memory"
-RECENT DETAIL
-+
-MEDIUM MEMORY
-+
-DISTANT MEMORY
-```
-
-## Motion Echo
-
-Retain movement while keeping the background relatively stable.
-
-```text id="ghosf-motion-echo"
-      ◉
-    ◉
-  ◉
-◉
-```
-
-## Time Slice
-
-Different areas of the image represent different moments.
-
-```text id="ghosf-time-slice"
-| t-10 | t-8 | t-6 | t-4 | t-2 | NOW |
-```
-
-Directions may include:
-
-```text id="ghosf-slice-directions"
-VERTICAL • HORIZONTAL • DIAGONAL • RADIAL • RANDOM
-```
-
-## Temporal Scan / Slit Scan
-
-Time moves through physical space.
-
-```text id="ghosf-slit-scan"
-TIME → → → → →
-
-| frame 1 | frame 2 | frame 3 | frame 4 |
-```
-
-## RGB Time Split
-
-Different color channels represent different moments.
-
-```text id="ghosf-rgb-time"
-RED   = NOW
-GREEN = RECENT PAST
-BLUE  = OLDER PAST
-```
-
-## Temporal Drift
-
-Older moments shift through space.
-
-```text id="ghosf-drift"
-NOW
-    ██████
-
-t-1
-  ██████
-
-t-2
-██████
-```
-
-## Time Tunnel
-
-Previous moments scale inward or outward.
-
-```text id="ghosf-tunnel"
-NOW
-████████████████
-
-PAST
-  ████████████
-
-OLDER
-    ████████
-
-OLDER
-      ████
-```
-
-## More experiments
-
-- Temporal Mirror
-- Color Age
-- Temporal Edge Trails
-- Ghost Silhouettes
-- Motion-based ghosting
-- Blur decay
-- Scale decay
-- Future + past layering
-
----
-
-# The GHOSF Engine
-
-```text id="ghosf-engine"
-PREVIOUS FRAME
-      │
-      ▼
- TEMPORAL AGE
-      │
- ┌────┼────┐
- ▼    ▼    ▼
-OPACITY
-RESOLUTION
-TRANSFORMATION
- └────┼────┘
-      ▼
-TEMPORAL LAYER
-      │
-      ▼
- COMPOSITOR
-      │
-      ▼
-CURRENT REALITY
-```
-
-GHOSF effects are not necessarily single filters.
-
-They are rules describing what happens to an image as it moves further away from the present.
-
----
-
-# Initial Goals
-
-The first version will focus on:
-
-- Drag-and-drop desktop GUI
-- Python + FFmpeg
-- Configurable frame interval
-- Configurable ghost history
-- Temporal opacity decay
-- **Temporal pixel decay**
-- Nearest-neighbor pixelation
-- Blend modes
-- Original audio preservation
+- Drag and drop media
+- Click to select media
+- End fade with cubic-Bézier control
+- Configuration fingerprints
+- Copy/load render settings
+- MP4 output
+- AVI output
+- Optional output optimization
+- Output folder selection
 - Progress reporting
-- End fade
-- Cubic Bézier-inspired temporal curves
+- Cancel / Abort processing
 
-The initial visual identity:
+### Configuration Fingerprints
 
-```text id="ghosf-identity"
-SHARP PRESENT
-+
-PIXELATED PAST
-+
-TEMPORAL LAYERS
+Render settings can be represented by a compact code:
+
+```text
+video_ghosf_F3FpdGGasd.mp4
 ```
 
-> **GHOSF turns the loss of information through time into an image.**
+Copy or share the code, then paste it back into `ghosf` to restore the same settings.
+
+---
+
+## Philosophy
+
+```text
+PAST                                      NOW
+
+▓▓▓▓▓▓▓▓▓▓ → ▒▒▒▒▒▒▒▒▒▒ → ░░░░░░░░ → ███████████
+
+TIME ───────────────────────────────────────────────────→
+```
+
+Video normally treats frames as separate moments.
+
+**ghosf lets previous moments remain visible.**

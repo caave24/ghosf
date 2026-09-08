@@ -1,3 +1,6 @@
+<img width="802" height="951" alt="image" src="https://github.com/user-attachments/assets/14ef420b-58c2-4ea4-964e-4303e11d0973" />
+
+
 # ghosf
 
 > **ghosf treats previous moments in time as image layers.**

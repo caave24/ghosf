@@ -4,6 +4,3 @@ textexample.mp4
 
 textexample2.mp4
 - Default settings of first build.
-
-textexample3.mp4
-- Low frame interval settings of first build.
